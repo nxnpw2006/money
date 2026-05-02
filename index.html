@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Worklog - B&W Border Edition with Total Hours</title>
+    <title>Worklog - B&W Border Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
-        /* CSS Variables */
         :root {
             --bg-color: #FFFFFF;
             --card-bg-color: #FFFFFF;
@@ -60,25 +59,25 @@
         input, select { padding: 14px; border: var(--sketch-border); border-radius: 2px; outline: none; transition: 0.3s; font-size: 0.95rem; background: var(--input-bg); color: var(--text-color); }
         
         .btn-group { display: flex; gap: 8px; border: var(--sketch-border); padding: 4px; border-radius: 2px; background: var(--input-bg); }
-        .btn-toggle { flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer; transition: 0.3s; color: var(--text-color); font-size: 0.85rem; }
+        .btn-toggle { flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer; color: var(--text-color); font-size: 0.85rem; }
         .btn-toggle.active { background: var(--border-color); color: var(--card-bg-color); font-weight: 600; }
         
-        .btn-main { width: 100%; padding: 18px; background: var(--border-color); color: var(--card-bg-color); border: var(--sketch-border); border-radius: 2px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 25px; transition: 0.2s; box-shadow: 6px 6px 0px var(--shadow-color); }
-        .btn-main:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0px var(--shadow-color); opacity: 0.9; }
+        .btn-main { width: 100%; padding: 18px; background: var(--border-color); color: var(--card-bg-color); border: var(--sketch-border); border-radius: 2px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 25px; box-shadow: 6px 6px 0px var(--shadow-color); }
+        .btn-main:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0px var(--shadow-color); }
 
         .table-container { overflow-x: auto; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; }
         th { padding: 18px; text-align: center; font-size: 0.75rem; color: var(--border-color); text-transform: uppercase; border-bottom: var(--sketch-border); }
-        td { padding: 18px; border-bottom: 1px solid var(--toggle-bg); font-size: 0.95rem; text-align: center; color: var(--text-color); }
+        td { padding: 18px; border-bottom: 1px solid var(--toggle-bg); font-size: 0.95rem; text-align: center; }
         
-        .action-btn { background: none; border: var(--sketch-border); cursor: pointer; padding: 6px; border-radius: 2px; transition: 0.2s; color: var(--border-color); }
-        .btn-del-min:hover { color: var(--danger-color); border-color: var(--danger-color); }
+        .action-btn { background: none; border: var(--sketch-border); cursor: pointer; padding: 6px; border-radius: 2px; color: var(--border-color); }
         
         .summary-box { background: var(--accent-color); padding: 30px; border-radius: 2px; border: var(--sketch-border); margin-top: 25px; box-shadow: 8px 8px 0px var(--shadow-color); }
         .net-income { font-size: 2rem; font-weight: 600; color: var(--text-color); margin-top: 15px; text-align: center; }
         .summary-details { display: flex; flex-wrap: wrap; justify-content: space-around; gap: 15px; font-size: 0.9rem; padding-bottom: 15px; border-bottom: 2px dashed var(--toggle-bg); }
 
         .filter-section { display: flex; gap: 12px; justify-content: center; margin-bottom: 30px; }
+        .filter-section select { min-width: 140px; border: var(--sketch-border); box-shadow: 6px 6px 0px var(--shadow-color); }
     </style>
 </head>
 <body>
@@ -151,10 +150,10 @@
     const HOURLY_RATE = 60;
 
     const Toast = Swal.mixin({
-        toast: true, position: 'top-end', showConfirmButton: false, timer: 2500, timerProgressBar: true
+        toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, timerProgressBar: true
     });
 
-    // Theme Switcher
+    // Theme Logic
     const themeSwitch = document.getElementById('themeSwitch');
     const sunIcon = document.getElementById('sunIcon');
     const moonIcon = document.getElementById('moonIcon');
@@ -180,7 +179,7 @@
         const months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
         months.forEach((m, i) => {
             let opt = new Option(m, i + 1);
-            if(i+1 === now.getMonth() + 1) opt.selected = true;
+            if(i+1 === (now.getMonth() + 1)) opt.selected = true;
             monthSelect.add(opt);
         });
 
@@ -209,7 +208,11 @@
         if (diff < 0) diff += 24;
         const workHours = Math.max(0, diff - breakHr);
         const incomeWork = workHours * (isOT ? HOURLY_RATE * 2 : HOURLY_RATE);
-        return { workHours: workHours.toFixed(2), dailyTotal: incomeWork, closePay: isClose ? 40 : 0 };
+        return { 
+            workHours: workHours.toFixed(2), 
+            dailyTotal: incomeWork,
+            closePay: isClose ? 40 : 0 
+        };
     }
 
     function saveData() {
@@ -219,31 +222,25 @@
         const breakHr = parseFloat(document.getElementById('breakHr').value) || 0;
         const editIndex = parseInt(document.getElementById('editIndex').value);
 
-        if(!dateVal || !timeIn || !timeOut) return Toast.fire({ icon: 'warning', title: 'กรอกข้อมูลไม่ครบ!' });
+        if(!dateVal || !timeIn || !timeOut) return Swal.fire('ลืมกรอกข้อมูลหรือเปล่า?', 'เช็ควันที่และเวลาอีกทีนะ!', 'warning');
 
         const calc = calculateDaily(timeIn, timeOut, breakHr, state.ot, state.close);
         const dateObj = new Date(dateVal);
         const entry = { date: dateVal, month: dateObj.getMonth() + 1, year: dateObj.getFullYear(), timeIn, timeOut, breakHr, isOT: state.ot, isClose: state.close, ...calc };
 
-        if (editIndex > -1) db[editIndex] = entry;
-        else db.push(entry);
+        if (editIndex > -1) {
+            db[editIndex] = entry;
+            document.getElementById('editIndex').value = "-1";
+            document.getElementById('btnSave').innerText = "บันทึกข้อมูลวันนี้";
+            Toast.fire({ icon: 'success', title: 'อัปเดตข้อมูลให้แล้วนะ!' }); // แก้ไขข้อความตอนอัปเดต
+        } else {
+            db.push(entry);
+            Toast.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จแล้วจ้า!' }); // แก้ไขข้อความตอนบันทึกใหม่
+        }
 
         localStorage.setItem('worklogs', JSON.stringify(db));
-        document.getElementById('editIndex').value = "-1";
-        document.getElementById('btnSave').innerText = "บันทึกข้อมูลวันนี้";
         renderTable();
         resetForm();
-        Toast.fire({ icon: 'success', title: 'บันทึกเรียบร้อย' });
-    }
-
-    function resetForm() {
-        document.getElementById('timeIn').value = "";
-        document.getElementById('timeOut').value = "";
-        state = { ot: false, close: false };
-        document.querySelectorAll('.btn-toggle').forEach(b => {
-            b.classList.remove('active');
-            if(b.innerText === 'No') b.classList.add('active');
-        });
     }
 
     function renderTable() {
@@ -256,7 +253,7 @@
 
         db.forEach((item, index) => {
             if(item.month === fMonth && item.year === fYear) {
-                totalIncome += parseFloat(item.dailyTotal);
+                totalIncome += item.dailyTotal;
                 totalClosePay += item.closePay;
                 totalHours += parseFloat(item.workHours);
 
@@ -269,7 +266,7 @@
                     <td style="font-weight:600">฿${item.dailyTotal.toLocaleString()}</td>
                     <td>
                         <button class="action-btn" onclick="editEntry(${index})"><i data-lucide="edit-3" style="width:16px"></i></button>
-                        <button class="action-btn btn-del-min" onclick="deleteEntry(${index})"><i data-lucide="trash-2" style="width:16px"></i></button>
+                        <button class="action-btn" onclick="deleteEntry(${index})"><i data-lucide="trash-2" style="width:16px"></i></button>
                     </td>
                 </tr>`;
             }
@@ -281,7 +278,7 @@
 
         document.getElementById('monthlySummary').innerHTML = `
             <div class="summary-details">
-                <div>รวมเวลา <b>${totalHours.toFixed(2)} ชม.</b></div>
+                <div>เวลารวม <b>${totalHours.toFixed(2)} ชม.</b></div>
                 <div>งาน <b>฿${totalIncome.toLocaleString()}</b></div>
                 <div>ปิดร้าน <b>฿${totalClosePay.toLocaleString()}</b></div>
                 <div>ภาษี 5% <b>-฿${tax.toLocaleString()}</b></div>
@@ -289,6 +286,21 @@
             <div class="net-income">รวมสุทธิ ฿${net.toLocaleString()}</div>
         `;
         lucide.createIcons();
+    }
+
+    function deleteEntry(index) {
+        Swal.fire({
+            title: 'จะลบจริงๆ หรอ?', text: "ลบแล้วกู้คืนไม่ได้น้า!", icon: 'warning',
+            showCancelButton: true, confirmButtonText: 'ลบเลย', cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#000', cancelButtonColor: '#666'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                db.splice(index, 1);
+                localStorage.setItem('worklogs', JSON.stringify(db));
+                renderTable();
+                Toast.fire({ icon: 'success', title: 'ลบข้อมูลเรียบร้อยแล้ว!' }); // เพิ่มแจ้งเตือนตอนลบสำเร็จ
+            }
+        });
     }
 
     function editEntry(index) {
@@ -299,18 +311,28 @@
         document.getElementById('breakHr').value = item.breakHr;
         document.getElementById('editIndex').value = index;
         document.getElementById('btnSave').innerText = "อัปเดตข้อมูลแถวนี้";
+        
         state.ot = item.isOT;
         state.close = item.isClose;
-        renderTable();
+        updateToggleUI(0, item.isOT);
+        updateToggleUI(1, item.isClose);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function deleteEntry(index) {
-        if(confirm('ลบรายการนี้ใช่ไหม?')) {
-            db.splice(index, 1);
-            localStorage.setItem('worklogs', JSON.stringify(db));
-            renderTable();
-        }
+    function updateToggleUI(groupIndex, val) {
+        const groups = document.querySelectorAll('.btn-group');
+        groups[groupIndex].querySelectorAll('.btn-toggle').forEach(b => b.classList.toggle('active', (b.innerText === 'Yes') === val));
+    }
+
+    function resetForm() {
+        document.getElementById('timeIn').value = "";
+        document.getElementById('timeOut').value = "";
+        document.getElementById('breakHr').value = 1;
+        document.getElementById('editIndex').value = "-1";
+        document.getElementById('btnSave').innerText = "บันทึกข้อมูลวันนี้";
+        state = { ot: false, close: false };
+        updateToggleUI(0, false);
+        updateToggleUI(1, false);
     }
 
     init();
