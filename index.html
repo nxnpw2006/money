@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Worklog - B&W Border Edition</title>
+    <title>Worklog - B&W Border Edition (Payroll Update)</title>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -130,9 +130,9 @@
                         <th>วันที่</th>
                         <th>เวลา</th>
                         <th>ชม.</th>
-                        <th>OT</th>
+                        <th>ประเภท</th>
                         <th>ปิดร้าน</th>
-                        <th>รายได้</th>
+                        <th>รายได้รวม</th>
                         <th>จัดการ</th>
                     </tr>
                 </thead>
@@ -201,16 +201,27 @@
         btn.classList.add('active');
     }
 
+    // แก้ไข Logic คำนวณรายวัน
     function calculateDaily(timeIn, timeOut, breakHr, isOT, isClose) {
         const start = new Date(`2000-01-01T${timeIn}`);
         const end = new Date(`2000-01-01T${timeOut}`);
         let diff = (end - start) / (1000 * 60 * 60);
         if (diff < 0) diff += 24;
         const workHours = Math.max(0, diff - breakHr);
-        const incomeWork = workHours * (isOT ? HOURLY_RATE * 2 : HOURLY_RATE);
+        
+        let incNormal = 0;
+        let incOT = 0;
+
+        if (isOT) {
+            incOT = workHours * (HOURLY_RATE * 2); // 2 แรงจะวิ่งเข้ากระเป๋า OT
+        } else {
+            incNormal = workHours * HOURLY_RATE; // ปกติจะวิ่งเข้ากระเป๋าปกติ
+        }
+
         return { 
             workHours: workHours.toFixed(2), 
-            dailyTotal: incomeWork,
+            incomeNormal: incNormal, // เก็บแยกเพื่อคำนวณภาษี
+            incomeOT: incOT,         // เก็บแยกเพื่อเลี่ยงภาษี
             closePay: isClose ? 40 : 0 
         };
     }
@@ -232,10 +243,10 @@
             db[editIndex] = entry;
             document.getElementById('editIndex').value = "-1";
             document.getElementById('btnSave').innerText = "บันทึกข้อมูลวันนี้";
-            Toast.fire({ icon: 'success', title: 'อัปเดตข้อมูลให้แล้วนะ!' }); // แก้ไขข้อความตอนอัปเดต
+            Toast.fire({ icon: 'success', title: 'อัปเดตข้อมูลให้แล้วนะ!' });
         } else {
             db.push(entry);
-            Toast.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จแล้วจ้า!' }); // แก้ไขข้อความตอนบันทึกใหม่
+            Toast.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จแล้วจ้า!' });
         }
 
         localStorage.setItem('worklogs', JSON.stringify(db));
@@ -249,21 +260,28 @@
         const tbody = document.getElementById('logTableBody');
         tbody.innerHTML = "";
         
-        let totalIncome = 0, totalClosePay = 0, totalHours = 0;
+        let totalNormal = 0, totalOT = 0, totalClosePay = 0, totalHours = 0;
 
         db.forEach((item, index) => {
             if(item.month === fMonth && item.year === fYear) {
-                totalIncome += item.dailyTotal;
+                // จัดการข้อมูลเก่าที่ไม่มีคีย์ incomeNormal/incomeOT
+                const normal = item.incomeNormal !== undefined ? item.incomeNormal : (item.isOT ? 0 : item.dailyTotal);
+                const ot = item.incomeOT !== undefined ? item.incomeOT : (item.isOT ? item.dailyTotal : 0);
+
+                totalNormal += normal;
+                totalOT += ot;
                 totalClosePay += item.closePay;
                 totalHours += parseFloat(item.workHours);
+
+                const rowSum = normal + ot + item.closePay;
 
                 tbody.innerHTML += `<tr>
                     <td>${item.date.split('-').reverse().slice(0,2).join('/')}</td>
                     <td><span style="font-size:0.8rem">${item.timeIn}-${item.timeOut}</span></td>
                     <td>${item.workHours}</td>
-                    <td>${item.isOT ? '●' : '○'}</td>
+                    <td>${item.isOT ? '<b>2 แรง</b>' : 'ปกติ'}</td>
                     <td>${item.isClose ? '฿'+item.closePay : '-'}</td>
-                    <td style="font-weight:600">฿${item.dailyTotal.toLocaleString()}</td>
+                    <td style="font-weight:600">฿${rowSum.toLocaleString()}</td>
                     <td>
                         <button class="action-btn" onclick="editEntry(${index})"><i data-lucide="edit-3" style="width:16px"></i></button>
                         <button class="action-btn" onclick="deleteEntry(${index})"><i data-lucide="trash-2" style="width:16px"></i></button>
@@ -272,16 +290,18 @@
             }
         });
 
-        const grandTotal = totalIncome + totalClosePay;
-        const tax = grandTotal * 0.05;
-        const net = grandTotal - tax;
+        // --- สูตรคำนวณสรุปผลตามสลิป ---
+        const taxable = totalNormal + totalClosePay; // ฐานภาษี = ปกติ + ปิดร้าน
+        const tax = Math.floor(taxable * 0.05);      // ภาษี 5% (ปัดเศษลงตามหลักบัญชี)
+        const net = (taxable - tax) + totalOT;      // สุทธิ = (ฐานภาษี - ภาษี) + ยอด 2 แรง
 
         document.getElementById('monthlySummary').innerHTML = `
             <div class="summary-details">
                 <div>เวลารวม <b>${totalHours.toFixed(2)} ชม.</b></div>
-                <div>งาน <b>฿${totalIncome.toLocaleString()}</b></div>
+                <div>ปกติ <b>฿${totalNormal.toLocaleString()}</b></div>
+                <div>2 แรง (OT) <b>฿${totalOT.toLocaleString()}</b></div>
                 <div>ปิดร้าน <b>฿${totalClosePay.toLocaleString()}</b></div>
-                <div>ภาษี 5% <b>-฿${tax.toLocaleString()}</b></div>
+                <div style="color:red">ภาษี 5% <b>-฿${tax.toLocaleString()}</b></div>
             </div>
             <div class="net-income">รวมสุทธิ ฿${net.toLocaleString()}</div>
         `;
@@ -298,7 +318,7 @@
                 db.splice(index, 1);
                 localStorage.setItem('worklogs', JSON.stringify(db));
                 renderTable();
-                Toast.fire({ icon: 'success', title: 'ลบข้อมูลเรียบร้อยแล้ว!' }); // เพิ่มแจ้งเตือนตอนลบสำเร็จ
+                Toast.fire({ icon: 'success', title: 'ลบข้อมูลเรียบร้อยแล้ว!' });
             }
         });
     }
