@@ -44,10 +44,13 @@
         * { box-sizing: border-box; font-family: 'IBM Plex Sans Thai', sans-serif; transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
         body { background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; display: flex; justify-content: center; position: relative; }
         
-        .theme-switch-wrapper { position: absolute; top: 20px; right: 20px; }
+        /* ปรับสไตล์ส่วนหัวด้านขวา (ธีม + ตั้งค่าค่าแรง) */
+        .top-controls { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 15px; }
+        .rate-setting { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; }
+        .rate-setting input { width: 70px; padding: 6px 10px; border: var(--sketch-border); text-align: center; font-weight: 600; }
         .theme-switch { cursor: pointer; background: none; border: none; padding: 8px; color: var(--text-color); display: flex; align-items: center; justify-content: center; }
 
-        .container { width: 100%; max-width: 950px; animation: fadeIn 0.8s ease; margin-top: 40px; }
+        .container { width: 100%; max-width: 950px; animation: fadeIn 0.8s ease; margin-top: 50px; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         h2 { text-align: center; color: var(--border-color); margin-bottom: 30px; font-weight: 600; letter-spacing: 1.5px; }
@@ -82,7 +85,11 @@
 </head>
 <body>
 
-<div class="theme-switch-wrapper">
+<div class="top-controls">
+    <div class="rate-setting">
+        <label for="hourlyRateInput" style="margin-bottom:0;">฿/ชม.</label>
+        <input type="number" id="hourlyRateInput" value="60" min="0" onchange="updateHourlyRate(this.value)">
+    </div>
     <button class="theme-switch" id="themeSwitch">
         <i data-lucide="sun" id="sunIcon"></i>
         <i data-lucide="moon" id="moonIcon" style="display:none"></i>
@@ -130,6 +137,7 @@
                         <th>วันที่</th>
                         <th>เวลา</th>
                         <th>ชม.</th>
+                        <th>เรท/ชม.</th>
                         <th>ประเภท</th>
                         <th>ปิดร้าน</th>
                         <th>รายได้รวม</th>
@@ -147,7 +155,9 @@
 <script>
     let db = JSON.parse(localStorage.getItem('worklogs')) || [];
     let state = { ot: false, close: false };
-    const HOURLY_RATE = 60;
+    
+    // ดึงค่าแรงปัจจุบันจาก localStorage ถ้าไม่มีให้ใช้ค่าเริ่มต้นเป็น 60
+    let HOURLY_RATE = parseFloat(localStorage.getItem('hourlyRate')) || 60;
 
     const Toast = Swal.mixin({
         toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, timerProgressBar: true
@@ -174,6 +184,9 @@
     });
 
     function init() {
+        // อัปเดตค่าแสดงผลตัวเลขค่าแรงบน Input ด้านบน
+        document.getElementById('hourlyRateInput').value = HOURLY_RATE;
+
         const now = new Date();
         const monthSelect = document.getElementById('filterMonth');
         const months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
@@ -195,14 +208,24 @@
         lucide.createIcons();
     }
 
+    // ฟังก์ชันอัปเดตและบันทึกค่าแรงใหม่
+    function updateHourlyRate(value) {
+        let rate = parseFloat(value);
+        if (isNaN(rate) || rate < 0) rate = 60;
+        HOURLY_RATE = rate;
+        localStorage.setItem('hourlyRate', rate);
+        Toast.fire({ icon: 'success', title: `ปรับค่าแรงเป็น ฿${rate}/ชม. แล้ว` });
+        renderTable(); // สั่งเรนเดอร์ตารางใหม่ทันที
+    }
+
     function setToggle(type, val, btn) {
         state[type] = val;
         btn.parentElement.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
     }
 
-    // แก้ไข Logic คำนวณรายวัน
-    function calculateDaily(timeIn, timeOut, breakHr, isOT, isClose) {
+    // แก้ไข Logic คำนวณรายวันให้ผูกกับค่าแรง ณ ตอนบันทึกข้อมูลนั้นๆ
+    function calculateDaily(timeIn, timeOut, breakHr, isOT, isClose, currentRate) {
         const start = new Date(`2000-01-01T${timeIn}`);
         const end = new Date(`2000-01-01T${timeOut}`);
         let diff = (end - start) / (1000 * 60 * 60);
@@ -213,15 +236,15 @@
         let incOT = 0;
 
         if (isOT) {
-            incOT = workHours * (HOURLY_RATE * 2); // 2 แรงจะวิ่งเข้ากระเป๋า OT
+            incOT = workHours * (currentRate * 2); 
         } else {
-            incNormal = workHours * HOURLY_RATE; // ปกติจะวิ่งเข้ากระเป๋าปกติ
+            incNormal = workHours * currentRate; 
         }
 
         return { 
             workHours: workHours.toFixed(2), 
-            incomeNormal: incNormal, // เก็บแยกเพื่อคำนวณภาษี
-            incomeOT: incOT,         // เก็บแยกเพื่อเลี่ยงภาษี
+            incomeNormal: incNormal, 
+            incomeOT: incOT,         
             closePay: isClose ? 40 : 0 
         };
     }
@@ -235,11 +258,28 @@
 
         if(!dateVal || !timeIn || !timeOut) return Swal.fire('ลืมกรอกข้อมูลหรือเปล่า?', 'เช็ควันที่และเวลาอีกทีนะ!', 'warning');
 
-        const calc = calculateDaily(timeIn, timeOut, breakHr, state.ot, state.close);
+        // แนบค่าแรงปัจจุบันเข้าไปคำนวณด้วย เผื่อกรณีในตารางมีวันเก่าที่เป็นเรทเดิม
+        const calc = calculateDaily(timeIn, timeOut, breakHr, state.ot, state.close, HOURLY_RATE);
         const dateObj = new Date(dateVal);
-        const entry = { date: dateVal, month: dateObj.getMonth() + 1, year: dateObj.getFullYear(), timeIn, timeOut, breakHr, isOT: state.ot, isClose: state.close, ...calc };
+        const entry = { 
+            date: dateVal, 
+            month: dateObj.getMonth() + 1, 
+            year: dateObj.getFullYear(), 
+            timeIn, 
+            timeOut, 
+            breakHr, 
+            isOT: state.ot, 
+            isClose: state.close, 
+            savedRate: HOURLY_RATE, // บันทึกเรทค่าแรง ณ วันนั้นเก็บไว้ด้วย
+            ...calc 
+        };
 
         if (editIndex > -1) {
+            // ถ้ากดแก้ไข ให้ยึดเรทค่าแรงเดิมของวันนั้นไว้ หรือถ้าอยากให้อัปเดตตามเรทใหม่ด้านบนก็สามารถทำได้
+            entry.savedRate = db[editIndex].savedRate || HOURLY_RATE;
+            const updatedCalc = calculateDaily(timeIn, timeOut, breakHr, state.ot, state.close, entry.savedRate);
+            Object.assign(entry, updatedCalc);
+
             db[editIndex] = entry;
             document.getElementById('editIndex').value = "-1";
             document.getElementById('btnSave').innerText = "บันทึกข้อมูลวันนี้";
@@ -264,7 +304,9 @@
 
         db.forEach((item, index) => {
             if(item.month === fMonth && item.year === fYear) {
-                // จัดการข้อมูลเก่าที่ไม่มีคีย์ incomeNormal/incomeOT
+                // สำหรับข้อมูลเก่าที่ยังไม่มีคีย์ savedRate ให้ดึงค่า HOURLY_RATE ปัจจุบันไปใช้
+                const rateUsed = item.savedRate !== undefined ? item.savedRate : 60;
+
                 const normal = item.incomeNormal !== undefined ? item.incomeNormal : (item.isOT ? 0 : item.dailyTotal);
                 const ot = item.incomeOT !== undefined ? item.incomeOT : (item.isOT ? item.dailyTotal : 0);
 
@@ -279,6 +321,7 @@
                     <td>${item.date.split('-').reverse().slice(0,2).join('/')}</td>
                     <td><span style="font-size:0.8rem">${item.timeIn}-${item.timeOut}</span></td>
                     <td>${item.workHours}</td>
+                    <td>฿${rateUsed}</td>
                     <td>${item.isOT ? '<b>2 แรง</b>' : 'ปกติ'}</td>
                     <td>${item.isClose ? '฿'+item.closePay : '-'}</td>
                     <td style="font-weight:600">฿${rowSum.toLocaleString()}</td>
@@ -291,9 +334,9 @@
         });
 
         // --- สูตรคำนวณสรุปผลตามสลิป ---
-        const taxable = totalNormal + totalClosePay; // ฐานภาษี = ปกติ + ปิดร้าน
-        const tax = Math.floor(taxable * 0.05);      // ภาษี 5% (ปัดเศษลงตามหลักบัญชี)
-        const net = (taxable - tax) + totalOT;      // สุทธิ = (ฐานภาษี - ภาษี) + ยอด 2 แรง
+        const taxable = totalNormal + totalClosePay; 
+        const tax = Math.floor(taxable * 0.05);      
+        const net = (taxable - tax) + totalOT;      
 
         document.getElementById('monthlySummary').innerHTML = `
             <div class="summary-details">
@@ -359,3 +402,4 @@
 </script>
 </body>
 </html>
+
